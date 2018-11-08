@@ -311,108 +311,9 @@ class ResourceReadUpdateDelete(ResourceToListItemMixin, generics.RetrieveUpdateD
 
 class ResourceListCreate(ResourceToListItemMixin, generics.ListCreateAPIView):
     """
-    Create a new resource or list existing resources
+        Create or List resources
+    """ 
 
-    REST URL: hsapi/resource/
-    HTTP method: POST
-
-    Request data payload parameters:
-    :type   resource_type: str
-    :type   title: str
-    :type   subject: str
-    :type   edit_users: str
-    :type   edit_groups: str
-    :type   view_users: str
-    :type   view_groups: str
-    :param  resource_type: resource type name
-    :param  title: (optional) title of the resource (default value: 'Untitled resource')
-    :param  edit_users: (optional) list of comma separated usernames that should have edit
-    permission for the resource
-    :param  edit_groups: (optional) list of comma separated group names that should have edit
-    permission for the resource
-    :param  view_users: (optional) list of comma separated usernames that should have view
-    permission for the resource
-    :param  view_groups: (optional) list of comma separated group names that should have view
-    permission for the resource
-    :param  metadata: (optional) data for any valid metadata element including resource specific
-    metadata elements can be passed as json string:
-    example (passing data for the 'Coverage' element):
-    [{'coverage':{'type': 'period', 'start': '01/01/2000', 'end': '12/12/2010'}}, ...]
-    Note: the parameter 'metadata' can't be used for passing data for the following core metadata
-    elements:
-    Title, Description (abstract), Subject (keyword), Date, Publisher, Type, Format
-    :param  extra_metadata: (optional) data for any user-defined key/value pair metadata elements
-    of the resource can be passed as json string
-    example :
-    {'Outlet Point Latitude': '40', 'Outlet Point Longitude': '-110'}
-    :return: id and type of the resource created
-    :rtype: json string of the format: {'resource-id':id, 'resource_type': resource type}
-    :raises:
-    NotAuthenticated: return json format: {'detail': 'Authentication credentials were not
-    provided.'}
-    ValidationError: return json format: {parameter-1':['error message-1'], 'parameter-2':
-    ['error message-2'], .. }
-
-    REST URL: hsapi/resource/
-    HTTP method: GET
-
-    Supported query parameters (all are optional):
-
-    :type   owner: str
-    :type   types: list of resource type class names
-    :type   from_date:  str (e.g., 2015-04-01)
-    :type   to_date:    str (e.g., 2015-05-01)
-    :type   edit_permission: bool
-    :param  owner: (optional) - to get a list of resources owned by a specified username
-    :param  types: (optional) - to get a list of resources of the specified resource types
-    :param  from_date: (optional) - to get a list of resources created on or after this date
-    :param  to_date: (optional) - to get a list of resources created on or before this date
-    :param  include_obsolete: (optional) - default is False which means the returned resource list
-    does not include obsoleted resource; if set to True, obsoleted resource will be included
-    :param  edit_permission: (optional) - to get a list of resources for which the authorised user
-    has edit permission
-    :param  coverage_type: (optional) - to get a list of resources that fall within the specified
-    spatial coverage boundary (must be either 'box' or 'point')
-    :param  north:  (optional) - north coordinate of spatial coverage. This parameter is required
-    if *coverage_type* has been specified
-    :param  south:  (optional) - north coordinate of spatial coverage. This parameter is required
-    if *coverage_type* has been specified with a value of 'box'
-    :param  east:  (optional) - east coordinate of spatial coverage. This parameter is required
-    if *coverage_type* has been specified
-    :param  west:  (optional) - west coordinate of spatial coverage. This parameter is required
-    if *coverage_type* has been specified with a value of 'box'
-    :rtype:  json string
-    :return:  a paginated list of resources with data for resource id, title, resource type,
-    creator, public, date created, date last updated, resource bag url path, and science
-    metadata url path
-
-    example return JSON format for GET /hsapi/resourceList:
-
-        {   "count":n
-            "next": link to next page
-            "previous": link to previous page
-            "results":[
-                    {"resource_type": resource type, "resource_title": resource title,
-                    "resource_id": resource id,
-                    "creator": creator name, "date_created": date resource created,
-                    "date_last_updated": date resource last updated, "public": true or false,
-                    "discoverable": true or false, "shareable": true or false,
-                    "immutable": true or false,
-                    "published": true or false, "bag_url": link to bag file,
-                    "science_metadata_url": link to science metadata,
-                    "resource_url": link to resource landing HTML page},
-                    {"resource_type": resource type, "resource_title": resource title,
-                    "resource_id": resource id,
-                    "creator": creator name, "date_created": date resource created,
-                    "date_last_updated": date resource last updated, "public": true or false,
-                    "discoverable": true or false, "shareable": true or false,
-                    "immutable": true or false,
-                    "published": true or false, "bag_url": link to bag file,
-                    "science_metadata_url": link to science metadata,
-                    "resource_url": link to resource landing HTML page},
-            ]
-        }
-    """
     def initialize_request(self, request, *args, **kwargs):
         """
         Hack to work around the following issue in django-rest-framework:
@@ -534,6 +435,11 @@ class ResourceListCreate(ResourceToListItemMixin, generics.ListCreateAPIView):
 
     pagination_class = PageNumberPagination
 
+
+    from drf_yasg.utils import swagger_auto_schema
+
+
+    @swagger_auto_schema(query_serializer=serializers.ResourceListRequestValidator)
     def get(self, request):
         return self.list(request)
 
