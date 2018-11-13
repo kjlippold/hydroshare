@@ -39,8 +39,8 @@ def check_relations(resource):
             try:
                 get_resource_by_shortkey(target, or_404=False)
             except BaseResource.DoesNotExist:
-                print("relation {} {} {} (this does not exist)"
-                      .format(resource.short_id, r.type, target))
+                print("Resource {} does not exist in Django"
+                      .format(target))
 
 
 def fix_irods_user_paths(resource, log_actions=True, echo_actions=False, return_actions=False):
@@ -597,15 +597,15 @@ class CheckJSONLD(object):
             return
 
 
-def repair_resource(resource, logger, stop_on_error=False,
+def repair_resource(res, logger, stop_on_error=False,
                     log_errors=True, echo_errors=False, return_errors=False):
     errors = []
     ecount = 0
 
     try:
-        resource = get_resource_by_shortkey(resource.short_id, or_404=False)
+        resource = get_resource_by_shortkey(res.short_id, or_404=False)
     except BaseResource.DoesNotExist:
-        msg = "Resource with id {} not found in Django Resources".format(resource.short_id)
+        msg = "Resource {} does not exist in Django".format(res.short_id)
         if log_errors:
             logger.error(msg)
         if echo_errors:
@@ -681,7 +681,7 @@ class CheckResource(object):
         try:
             self.resource = get_resource_by_shortkey(self.short_id, or_404=False)
         except BaseResource.DoesNotExist:
-            print("{} does not exist in Django".format(self.short_id))
+            print("Resource {} does not exist in Django".format(self.short_id))
             return
 
         # skip federated resources if not configured to handle these

@@ -27,9 +27,9 @@ class Command(BaseCommand):
         if len(options['resource_ids']) > 0:  # an array of resource short_id to check.
             for rid in options['resource_ids']:
                 try:
-                    resource = get_resource_by_shortkey(rid)
+                    resource = get_resource_by_shortkey(rid, or_404=False)
                 except BaseResource.DoesNotExist:
-                    msg = "Resource with id {} not found in Django Resources".format(rid)
+                    msg = "Resource {} does not exist in Django".format(rid)
                     print(msg)
                     continue
 
@@ -40,9 +40,9 @@ class Command(BaseCommand):
             print("LOOKING FOR RELATION ERRORS FOR ALL RESOURCES")
             for r in BaseResource.objects.all():
                 try:
-                    resource = get_resource_by_shortkey(r.short_id)
+                    resource = get_resource_by_shortkey(r.short_id, or_404=False)
                 except BaseResource.DoesNotExist:
-                    msg = "Resource with id {} not found in Django Resources".format(rid)
+                    msg = "Resource {} does not exist in Django".format(rid)
                     print(msg)
                     continue
 

@@ -47,12 +47,25 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         if len(options['resource_ids']) > 0:  # an array of resource short_id to check.
             for rid in options['resource_ids']:
-                resource = get_resource_by_shortkey(rid)
+
+                try:
+                    resource = get_resource_by_shortkey(rid, or_404=False)
+                except BaseResource.DoesNotExist:
+                    print("Resource {} does not exist in Django"
+                          .format(resource.short_id))
+                    continue
+
                 if (options['type'] is None or resource.resource_type == options['type']) and \
                    (options['storage'] is None or resource.storage_type == options['storage']):
                     CheckResource(rid).test()
         else:
             for resource in BaseResource.objects.all():
+                try:
+                    resource = get_resource_by_shortkey(rid, or_404=False)
+                except BaseResource.DoesNotExist:
+                    print("Resource {} does not exist in Django"
+                          .format(resource.short_id))
+                    continue
                 if (options['type'] is None or resource.resource_type == options['type']) and \
                    (options['storage'] is None or resource.storage_type == options['storage']):
                     CheckResource(resource.short_id).test()

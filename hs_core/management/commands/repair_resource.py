@@ -46,9 +46,9 @@ class Command(BaseCommand):
         if len(options['resource_ids']) > 0:  # an array of resource short_id to check.
             for rid in options['resource_ids']:
                 try:
-                    resource = get_resource_by_shortkey(rid)
+                    resource = get_resource_by_shortkey(rid, or_404=False)
                 except BaseResource.NotFoundException:
-                    msg = "resource {} not found".format(rid)
+                    msg = "Resource {} does not exist in Django".format(rid)
                     print(msg)
                     continue
                 _, count = repair_resource(resource,
@@ -68,9 +68,9 @@ class Command(BaseCommand):
             print("REPAIRING ALL RESOURCES")
             for r in BaseResource.objects.all():
                 try:
-                    resource = get_resource_by_shortkey(r.short_id)
+                    resource = get_resource_by_shortkey(r.short_id, or_404=False)
                 except BaseResource.NotFoundException:
-                    msg = "resource {} not found".format(rid)
+                    msg = "Resource {} does not exist in Django".format(r.short_id)
                     print(msg)
                     continue
 

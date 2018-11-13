@@ -103,9 +103,16 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         if len(options['resource_ids']) > 0:  # an array of resource short_id to check.
             for rid in options['resource_ids']:
-                resource = get_resource_by_shortkey(rid)
+                try:
+                    resource = get_resource_by_shortkey(rid, or_404=False)
+                except BaseResource.DoesNotExist:
+                    print("Resource {} does not exist in Django".format(rid))
                 self.measure_filtered_resource(resource, options)
 
         else:
-            for resource in BaseResource.objects.all():
+            for rid in BaseResource.objects.all():
+                try:
+                    resource = get_resource_by_shortkey(rid, or_404=False)
+                except BaseResource.DoesNotExist:
+                    print("Resource {} does not exist in Django".format(rid))
                 self.measure_filtered_resource(resource, options)
