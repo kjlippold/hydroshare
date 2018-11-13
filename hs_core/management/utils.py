@@ -15,15 +15,17 @@ import os
 from django.conf import settings
 from django.contrib.sites.models import Site
 from django.core.exceptions import ValidationError
+from django.core.management.base import BaseCommand
+
 from django_irods.storage import IrodsStorage
 from django_irods.icommands import SessionException
-from hs_file_types.utils import set_logical_file_type, get_logical_file_type
 
 from requests import post
 
 from hs_core.models import BaseResource
 from hs_core.hydroshare import get_resource_by_shortkey
 from hs_core.views.utils import link_irods_file_to_django
+from hs_file_types.utils import set_logical_file_type, get_logical_file_type
 
 import logging
 
@@ -753,3 +755,125 @@ class CheckResource(object):
                 print("  Logical file errors:")
                 for e in logical_issues:
                     print("    {}".format(e))
+
+
+class ResourceCommand(BaseCommand):
+    """
+    Simplified interface to commands that act on resources.
+
+    This interface is based upon BaseCommand and reused for several
+    kinds of commands that act on resources, including listing, repairing, etc.
+    One inherits from this class and overrides one function resource_action.
+    Then that function is applied to all resources listed on the command line,
+    using filters that are also interpreted on the command line.
+
+    """
+    help = "Repeat a command for a list of resources."
+
+    def resource_action(self, options):
+        """
+        Do an action on a resource
+
+        :param options: options from the command line based upon the BaseCommand package
+
+        This must be overridden with the appropriate action
+
+        """
+        print("resource_action must be overridden for ResourceCommand to work.")
+        exit(1)
+
+    def add_arguments(self, parser):
+        """
+        Arguments that apply to resource selection
+        """
+
+        # a list of resource id's: none means all.
+        parser.add_argument('resource_ids', nargs='*', type=str)
+
+        # Named (optional) arguments
+        parser.add_argument(
+            '--log',
+            action='store_true',  # True for presence, False for absence
+            dest='log',           # value is options['log']
+            help='log errors to system log',
+        )
+
+        parser.add_argument(  # type is resource.resource_type
+            '--type',
+            dest='type',
+            help='limit to resources of a particular type'
+        )
+
+        parser.add_argument(
+            '--storage',
+            dest='storage',
+            help='limit to specific storage medium (local, user, federated)'
+        )
+
+        parser.add_argument(
+            '--access',
+            dest='access',
+            help='limit to specific access class (public, discoverable, private)'
+        )
+
+        parser.add_argument(
+            '--has_subfolders',
+            action='store_true',  # True for presence, False for absence
+            dest='has_subfolders',  # value is options['has_subfolders']
+            help='limit to resources with subfolders',
+        )
+
+    @staticmethod
+    def has_subfolders(resource):
+        """
+        Returns true if a resource has subfolders present in its file hierarchy.
+
+        :param resource: a fully type-qualified resource as returned from get_resource_by_shortkey
+        """
+        for f in resource.files.all():
+            if '/' in f.short_path:
+                return True
+        return False
+
+    def include_resource(self, resource, options):
+        """
+        filter a resource according to command-line options
+
+        :param resource: a fully type-qualified resource as returned from get_resource_by_shortkey
+        :param options: an option list as returned by BaseCommand as argument to handle()
+        """
+        if (options['type'] is None or resource.resource_type == options['type']) and \
+           (options['storage'] is None or resource.storage_type == options['storage']) and \
+           (options['access'] != 'public' or resource.raccess.public) and \
+           (options['access'] != 'discoverable' or resource.raccess.discoverable) and \
+           (options['access'] != 'private' or not resource.raccess.discoverable) and \
+           (not options['has_subfolders'] or ResourceCommand.has_subfolders(resource)):
+            return True
+        else:
+            return False
+
+    def handle(self, *args, **options):
+        """
+        handle a command that involves multiple resources
+
+        options are defined via add_arguments above.
+        """
+
+        if len(options['resource_ids']) > 0:  # an array of resource short_id to check.
+            for rid in options['resource_ids']:
+                try:
+                    resource = get_resource_by_shortkey(rid, or_404=False)
+                except BaseResource.DoesNotExist:
+                    print("Resource {} does not exist in Django"
+                          .format(resource.short_id))
+                    continue
+                self.resource_action(resource, options)
+        else:
+            for resource in BaseResource.objects.all():
+                try:
+                    resource = get_resource_by_shortkey(rid, or_404=False)
+                except BaseResource.DoesNotExist:
+                    print("Resource {} does not exist in Django"
+                          .format(resource.short_id))
+                    continue
+                self.resource_action(resource, options)
