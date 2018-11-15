@@ -4,9 +4,8 @@
 * Optional argument --log: logs output to system log.
 """
 
-from django.core.management.base import BaseCommand
 from hs_core.models import BaseResource
-from hs_core.management.utils import check_irods_files
+from hs_core.management.utils import check_irods_files, ResourceCommand
 
 
 def debug_resource(short_id):
@@ -61,25 +60,10 @@ def debug_resource(short_id):
     # }
 
 
-class Command(BaseCommand):
-    help = "Print debugging information about logical files."
+class Command(ResourceCommand):
+    help = "Print debugging information about resources."
 
-    def add_arguments(self, parser):
+    default_to_all = False
 
-        # a list of resource id's: none does nothing.
-        parser.add_argument('resource_ids', nargs='*', type=str)
-
-        # Named (optional) arguments
-        parser.add_argument(
-            '--log',
-            action='store_true',  # True for presence, False for absence
-            dest='log',           # value is options['log']
-            help='log errors to system log',
-        )
-
-    def handle(self, *args, **options):
-        if len(options['resource_ids']) > 0:  # an array of resource short_id to check.
-            for rid in options['resource_ids']:
-                debug_resource(rid)
-        else:
-            print("No resources to check.")
+    def resource_action(self, resource, options):
+        debug_resource(resource.rid)

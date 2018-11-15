@@ -770,6 +770,8 @@ class ResourceCommand(BaseCommand):
     """
     help = "Repeat a command for a list of resources."
 
+    default_to_all = True  # by default, with no arguments, operate on all resources
+
     def resource_action(self, options):
         """
         Do an action on a resource
@@ -796,6 +798,13 @@ class ResourceCommand(BaseCommand):
             action='store_true',  # True for presence, False for absence
             dest='log',           # value is options['log']
             help='log errors to system log',
+        )
+
+        parser.add_argument(
+            '--verbose',
+            action='store_true',  # True for presence, False for absence
+            dest='verbose',           # value is options['log']
+            help='print running log of actions',
         )
 
         parser.add_argument(  # type is resource.resource_type
@@ -867,13 +876,20 @@ class ResourceCommand(BaseCommand):
                     print("Resource {} does not exist in Django"
                           .format(resource.short_id))
                     continue
+                if options['verbose']:
+                    print("Processing {}".format(resource.short_id))
                 self.resource_action(resource, options)
         else:
-            for resource in BaseResource.objects.all():
-                try:
-                    resource = get_resource_by_shortkey(rid, or_404=False)
-                except BaseResource.DoesNotExist:
-                    print("Resource {} does not exist in Django"
-                          .format(resource.short_id))
-                    continue
-                self.resource_action(resource, options)
+            if self.default_to_all:
+                for r in BaseResource.objects.all():
+                    try:
+                        resource = get_resource_by_shortkey(r.short_id, or_404=False)
+                    except BaseResource.DoesNotExist:
+                        print("Resource {} does not exist in Django"
+                              .format(r.short_id))
+                        continue
+                    if options['verbose']:
+                        print("Processing {}".format(resource.short_id))
+                    self.resource_action(resource, options)
+            else:
+                print("no resources specified.")

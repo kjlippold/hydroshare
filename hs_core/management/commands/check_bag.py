@@ -8,12 +8,12 @@ Generate metadata and bag for a resource from Django
 import os
 import requests
 from django.conf import settings
-from django.core.management.base import BaseCommand
 from hs_core.models import BaseResource
 from hs_core.hydroshare import hs_requests
 from hs_core.hydroshare.hs_bagit import create_bag_files
 from hs_core.tasks import create_bag_by_irods
 from hs_core.hydroshare.utils import get_resource_by_shortkey
+from hs_core.management.utils import ResourceCommand
 from django_irods.icommands import SessionException
 
 
@@ -196,10 +196,13 @@ def check_bag(rid, options):
         print("Resource with id {} does not exist in iRODS".format(rid))
 
 
-class Command(BaseCommand):
+class Command(ResourceCommand):
     help = "Create metadata files and bag for a resource."
 
     def add_arguments(self, parser):
+
+        # add arguments from resource template
+        super(Command, self).add_arguments(parser)
 
         # a list of resource id's, or none to check all resources
         parser.add_argument('resource_ids', nargs='*', type=str)
@@ -283,11 +286,5 @@ class Command(BaseCommand):
             help='HydroShare password'
         )
 
-    def handle(self, *args, **options):
-
-        if len(options['resource_ids']) > 0:  # an array of resource short_id to check.
-            for rid in options['resource_ids']:
-                check_bag(rid, options)
-        else:
-            for r in BaseResource.objects.all():
-                check_bag(r.short_id, options)
+    def resource_action(self, resource, options):
+        check_bag(resource.short_id, options)

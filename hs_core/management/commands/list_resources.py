@@ -42,7 +42,7 @@ class Command(ResourceCommand):
     help = "List a set of resources."
 
     # this defines what to do when a resource is qualified according to the command line
-    def resource_action(self, resource):
+    def resource_action(self, resource, options):
         storage = resource.get_irods_storage()
         if storage.exists(resource.root_path):
             measure_resource(resource.short_id)

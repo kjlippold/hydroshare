@@ -16,5 +16,5 @@ from hs_core.management.utils import CheckResource, ResourceCommand
 class Command(ResourceCommand):
     help = "Print results of testing resource integrity."
 
-    def resource_action(self, resource):
+    def resource_action(self, resource, options):
         CheckResource(resource.short_id).test()
