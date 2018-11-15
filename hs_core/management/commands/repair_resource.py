@@ -13,76 +13,24 @@ This checks that:
 * Optional argument --log instead logs output to system log.
 """
 
-from django.core.management.base import BaseCommand
-from hs_core.models import BaseResource
-from hs_core.hydroshare.utils import get_resource_by_shortkey
-from hs_core.management.utils import repair_resource
-
-import logging
+from hs_core.management.utils import repair_resource, ResourceCommand
 
 
-class Command(BaseCommand):
+class Command(ResourceCommand):
     help = "Check synchronization between iRODS and Django."
 
-    def add_arguments(self, parser):
+    def resource_action(self, resource, options):
 
-        # a list of resource id's, or none to check all resources
-        parser.add_argument('resource_ids', nargs='*', type=str)
-
-        # Named (optional) arguments
-        parser.add_argument(
-            '--log',
-            action='store_true',  # True for presence, False for absence
-            dest='log',  # value is options['log']
-            help='log errors to system log',
-        )
-
-    def handle(self, *args, **options):
-
-        logger = logging.getLogger(__name__)
-        log_errors = options['log']
-        echo_errors = not options['log']
-
-        if len(options['resource_ids']) > 0:  # an array of resource short_id to check.
-            for rid in options['resource_ids']:
-                try:
-                    resource = get_resource_by_shortkey(rid, or_404=False)
-                except BaseResource.NotFoundException:
-                    msg = "Resource {} does not exist in Django".format(rid)
-                    print(msg)
-                    continue
-                _, count = repair_resource(resource,
-                                           echo_errors=echo_errors,
-                                           log_errors=log_errors,
-                                           return_errors=False)
-                if count:
-                    msg = "... affected resource {} has type {}, title '{}'"\
-                          .format(resource.short_id, resource.resource_type,
-                                  resource.title.encode('ascii', 'replace'))
-                    if log_errors:
-                        logger.info(msg)
-                    if echo_errors:
-                        print(msg)
-
-        else:  # check all resources
-            print("REPAIRING ALL RESOURCES")
-            for r in BaseResource.objects.all():
-                try:
-                    resource = get_resource_by_shortkey(r.short_id, or_404=False)
-                except BaseResource.NotFoundException:
-                    msg = "Resource {} does not exist in Django".format(r.short_id)
-                    print(msg)
-                    continue
-
-                _, count = repair_resource(resource,
-                                           echo_errors=echo_errors,
-                                           log_errors=log_errors,
-                                           return_errors=False)
-                if count:
-                    msg = "... affected resource {} has type {}, title '{}'"\
-                          .format(resource.short_id, resource.resource_type,
-                                  resource.title.encode('ascii', 'replace'))
-                    if log_errors:
-                        logger.info(msg)
-                    if echo_errors:
-                        print(msg)
+        _, count = repair_resource(resource, self.logger,
+                                   echo_errors=not options['log'],
+                                   log_errors=options['log'],
+                                   return_errors=False)
+        if count:
+            msg = "... affected resource {} has type {}, title '{}'"\
+                  .format(resource.short_id, resource.resource_type,
+                          resource.title.encode('ascii', 'replace'))
+            self.log(msg)
+            if options['log']:
+                self.logger.info(msg)
+            else:
+                print(msg)

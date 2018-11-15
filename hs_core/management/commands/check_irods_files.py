@@ -13,26 +13,16 @@ This checks that:
 * Optional argument --log instead logs output to system log.
 """
 
-from django.core.management.base import BaseCommand
-from hs_core.models import BaseResource
-from hs_core.management.utils import check_irods_files, check_for_dangling_irods
+from hs_core.management.utils import check_irods_files, check_for_dangling_irods, ResourceCommand
 
 
-class Command(BaseCommand):
+class Command(ResourceCommand):
     help = "Check synchronization between iRODS and Django."
 
     def add_arguments(self, parser):
 
-        # a list of resource id's, or none to check all resources
-        parser.add_argument('resource_ids', nargs='*', type=str)
-
-        # Named (optional) arguments
-        parser.add_argument(
-            '--log',
-            action='store_true',  # True for presence, False for absence
-            dest='log',  # value is options['log']
-            help='log errors to system log',
-        )
+        print("adding default arguments.")
+        super(Command, self).add_arguments(parser)
 
         # Named (optional) arguments
         parser.add_argument(
@@ -63,47 +53,31 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         if options['unreferenced']:
-            print("LOOKING FOR IRODS RESOURCES NOT IN DJANGO")
+            if options['verbose']:
+                print("LOOKING FOR IRODS RESOURCES NOT IN DJANGO")
             check_for_dangling_irods(echo_errors=not options['log'],
                                      log_errors=options['log'],
                                      return_errors=False)
 
-        elif len(options['resource_ids']) > 0:  # an array of resource short_id to check.
-            for rid in options['resource_ids']:
-                try:
-                    resource = BaseResource.objects.get(short_id=rid)
-                except BaseResource.DoesNotExist:
-                    msg = "Resource with id {} not found in Django Resources".format(rid)
-                    print(msg)
-
-                print("LOOKING FOR FILE ERRORS FOR RESOURCE {}".format(rid))
+        else:
+            if options['verbose']:
+                print("LOOKING FOR FILE ERRORS FOR ALL RESOURCES")
                 if options['clean_irods']:
                     print(' (deleting unreferenced iRODs files)')
                 if options['clean_django']:
                     print(' (deleting Django file objects without files)')
                 if options['sync_ispublic']:
                     print(' (correcting isPublic in iRODs)')
-                check_irods_files(resource, stop_on_error=False,
-                                  echo_errors=not options['log'],
-                                  log_errors=options['log'],
-                                  return_errors=False,
-                                  clean_irods=options['clean_irods'],
-                                  clean_django=options['clean_django'],
-                                  sync_ispublic=options['sync_ispublic'])
+            # handle list of resources or all resources
+            super(Command, self).handle(*args, **options)
 
-        else:  # check all resources
-            print("LOOKING FOR FILE ERRORS FOR ALL RESOURCES")
-            if options['clean_irods']:
-                print(' (deleting unreferenced iRODs files)')
-            if options['clean_django']:
-                print(' (deleting Django file objects without files)')
-            if options['sync_ispublic']:
-                print(' (correcting isPublic in iRODs)')
-            for r in BaseResource.objects.all():
-                check_irods_files(r, stop_on_error=False,
-                                  echo_errors=not options['log'],  # Don't both log and echo
-                                  log_errors=options['log'],
-                                  return_errors=False,
-                                  clean_irods=options['clean_irods'],
-                                  clean_django=options['clean_django'],
-                                  sync_ispublic=options['sync_ispublic'])
+    def resource_action(self, resource, options):
+        if options['verbose']:
+            self.log("LOOKING FOR FILE ERRORS FOR RESOURCE {}".format(resource.short_id), options)
+        check_irods_files(resource, stop_on_error=False,
+                          echo_errors=not options['log'],
+                          log_errors=options['log'],
+                          return_errors=False,
+                          clean_irods=options['clean_irods'],
+                          clean_django=options['clean_django'],
+                          sync_ispublic=options['sync_ispublic'])

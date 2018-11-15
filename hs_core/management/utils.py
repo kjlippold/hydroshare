@@ -599,6 +599,13 @@ class CheckJSONLD(object):
             return
 
 
+def log_or_print(message, logger, log_errors):
+    if log_errors:
+        logger.info(message)
+    else:
+        print(message)
+
+
 def repair_resource(res, logger, stop_on_error=False,
                     log_errors=True, echo_errors=False, return_errors=False):
     errors = []
@@ -608,10 +615,7 @@ def repair_resource(res, logger, stop_on_error=False,
         resource = get_resource_by_shortkey(res.short_id, or_404=False)
     except BaseResource.DoesNotExist:
         msg = "Resource {} does not exist in Django".format(res.short_id)
-        if log_errors:
-            logger.error(msg)
-        if echo_errors:
-            print(msg)
+        log_or_print(msg, logger, log_errors)
         if return_errors:
             errors.append(msg)
             ecount = ecount + 1
@@ -767,8 +771,14 @@ class ResourceCommand(BaseCommand):
     Then that function is applied to all resources listed on the command line,
     using filters that are also interpreted on the command line.
 
+    Arguments include:
+        --type=CompositeResource
+        --storage=federated
+        --access=public
+    etc.
+
     """
-    help = "Repeat a command for a list of resources."
+    help = "Repeat an action for a list of resources."
 
     default_to_all = True  # by default, with no arguments, operate on all resources
 
@@ -781,15 +791,14 @@ class ResourceCommand(BaseCommand):
         This must be overridden with the appropriate action
 
         """
-        print("resource_action must be overridden for ResourceCommand to work.")
+        print("Function resource_action must be overridden for ResourceCommand to work.")
         exit(1)
 
     def add_arguments(self, parser):
         """
-        Arguments that apply to resource selection
+        Specify arguments that apply to resource selection
         """
-
-        # a list of resource id's: none means all.
+        # a list of resource id's: none means all unless default_to_all is False
         parser.add_argument('resource_ids', nargs='*', type=str)
 
         # Named (optional) arguments
@@ -832,6 +841,14 @@ class ResourceCommand(BaseCommand):
             help='limit to resources with subfolders',
         )
 
+    logger = logging.getLogger(__name__)
+
+    def log(self, message, options):
+        if options['log']:
+            self.logger.info(message)
+        else:
+            print(message)
+
     @staticmethod
     def has_subfolders(resource):
         """
@@ -873,23 +890,26 @@ class ResourceCommand(BaseCommand):
                 try:
                     resource = get_resource_by_shortkey(rid, or_404=False)
                 except BaseResource.DoesNotExist:
-                    print("Resource {} does not exist in Django"
-                          .format(resource.short_id))
+                    self.log("Resource {} does not exist in Django"
+                             .format(resource.short_id), options)
                     continue
                 if options['verbose']:
-                    print("Processing {}".format(resource.short_id))
+                    self.log("Processing {}".format(resource.short_id), options)
+
                 self.resource_action(resource, options)
         else:
             if self.default_to_all:
+                if options['verbose']:
+                    self.log("ACTING ON ALL RESOURCES", options)
                 for r in BaseResource.objects.all():
                     try:
                         resource = get_resource_by_shortkey(r.short_id, or_404=False)
                     except BaseResource.DoesNotExist:
-                        print("Resource {} does not exist in Django"
-                              .format(r.short_id))
+                        self.log("Resource {} does not exist in Django"
+                                 .format(r.short_id), options)
                         continue
                     if options['verbose']:
-                        print("Processing {}".format(resource.short_id))
+                        self.log("Processing {}".format(resource.short_id), options)
                     self.resource_action(resource, options)
             else:
-                print("no resources specified.")
+                self.log("no resources specified.")
