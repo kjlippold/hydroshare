@@ -13,5 +13,5 @@ from hs_core.management.utils import CheckJSONLD, ResourceCommand
 class Command(ResourceCommand):
     help = "Checks resources for appropriate JSON returns"
 
-    def resource_action(self, resource, options): 
-        CheckJSONLD(resource.short_id).test(options)
+    def resource_action(self, resource, options):
+        CheckJSONLD(resource.short_id).test(self.logger, options)

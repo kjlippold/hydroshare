@@ -9,7 +9,7 @@ from hs_core.discovery_parser import ParseSQ
 
 
 class Command(BaseCommand):
-    help = "Print debugging information about logical files."
+    help = "Print debugging information about SOLR queries."
 
     def add_arguments(self, parser):
 

@@ -29,6 +29,6 @@ class Command(ResourceCommand):
                                  log_actions=options['log'],
                                  return_actions=False)
         else:
-            if options['verbose']:
-                self.log("Resource with id {} is not a default userspace resource"
-                         .format(resource.short_path))
+            self.log_or_print_error("Resource with id {} is not a default userspace resource"
+                                    .format(resource.short_path),
+                                    options)

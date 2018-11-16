@@ -18,7 +18,7 @@ def debug_facets(facets):
 
 
 class Command(BaseCommand):
-    help = "Print debugging information about logical files."
+    help = "Print debugging information about facet queries."
 
     def add_arguments(self, parser):
 

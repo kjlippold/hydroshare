@@ -47,4 +47,6 @@ class Command(ResourceCommand):
         if storage.exists(resource.root_path):
             measure_resource(resource.short_id)
         else:
-            print("Resource {} does not exist in iRODS".format(resource.short_id))
+            self.log_or_print_error("Resource {} does not exist in iRODS"
+                                    .format(resource.short_id),
+                                    options)

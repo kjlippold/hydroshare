@@ -24,20 +24,17 @@ class Command(ResourceCommand):
            resource.resource_type != 'ModelInstanceResource' and \
            resource.resource_type != 'ModelProgramResource':
             if options['verbose']:
-                self.log("resource {} has type {}: skipping".format(resource.short_id,
-                                                                    resource.resource_type))
+                self.log_or_print("resource {} has type {}: skipping"
+                                  .format(resource.short_id, resource.resource_type),
+                                  options)
         else:
-            if options['verbose']:
-                self.log("LOOKING FOR UNREGISTERED IRODS FILES FOR RESOURCE {} ({} files)"
-                         .format(resource.short_id, str(resource.files.all().count())))
+            self.log_or_print_verbose("LOOKING FOR UNREGISTERED IRODS FILES FOR {} ({} files)"
+                .format(resource.short_id, str(resource.files.all().count())), options)
         _, count = ingest_irods_files(resource,
                                       self.logger,
-                                      stop_on_error=False,
-                                      echo_errors=not options['log'],
-                                      log_errors=options['log'],
+                                      options,
                                       return_errors=False)
         if count:
             msg = "... affected resource {} has type {}, title '{}'"\
-                  .format(resource.short_id, resource.resource_type,
-                          resource.title)
-            self.log(msg, options)
+                .format(resource.short_id, resource.resource_type, resource.title)
+            self.log_or_print(msg, options)

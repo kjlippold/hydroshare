@@ -15,7 +15,7 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
 
-        # a list of resource id's, or none to check all resources
+        # a list of resource id's to delete
         parser.add_argument('resource_ids', nargs='*', type=str)
 
     def handle(self, *args, **options):

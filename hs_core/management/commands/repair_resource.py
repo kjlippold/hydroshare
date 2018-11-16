@@ -21,16 +21,10 @@ class Command(ResourceCommand):
 
     def resource_action(self, resource, options):
 
-        _, count = repair_resource(resource, self.logger,
-                                   echo_errors=not options['log'],
-                                   log_errors=options['log'],
+        _, count = repair_resource(resource, self.logger, options,
                                    return_errors=False)
         if count:
             msg = "... affected resource {} has type {}, title '{}'"\
                   .format(resource.short_id, resource.resource_type,
                           resource.title.encode('ascii', 'replace'))
-            self.log(msg)
-            if options['log']:
-                self.logger.info(msg)
-            else:
-                print(msg)
+            self.log_or_print(msg, options)

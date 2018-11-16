@@ -74,10 +74,4 @@ class Command(ResourceCommand):
     def resource_action(self, resource, options):
         if options['verbose']:
             self.log("LOOKING FOR FILE ERRORS FOR RESOURCE {}".format(resource.short_id), options)
-        check_irods_files(resource, stop_on_error=False,
-                          echo_errors=not options['log'],
-                          log_errors=options['log'],
-                          return_errors=False,
-                          clean_irods=options['clean_irods'],
-                          clean_django=options['clean_django'],
-                          sync_ispublic=options['sync_ispublic'])
+        check_irods_files(resource, self.logger, options, return_errors=False)
