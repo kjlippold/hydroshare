@@ -10,135 +10,34 @@ If a file in iRODS is not present in Django, it attempts to register that file i
 * Optional argument --log instead logs output to system log.
 """
 
-from django.core.management.base import BaseCommand
-from hs_core.models import BaseResource
-
-from hs_core.management.utils import ingest_irods_files
+from hs_core.management.utils import ingest_irods_files, ResourceCommand
 
 
-import logging
+class Command(ResourceCommand):
+    help = "Synchronize iRODS and Django concepts of files."
 
-
-class Command(BaseCommand):
-    help = "Check existence of proper Django metadata."
-
-    def add_arguments(self, parser):
-
-        # a list of resource id's, or none to check all resources
-        parser.add_argument('resource_ids', nargs='*', type=str)
-
-        # Named (optional) arguments
-        parser.add_argument(
-            '--log',
-            action='store_true',  # True for presence, False for absence
-            dest='log',  # value is options['log']
-            help='log errors to system log',
-        )
-
-    def handle(self, *args, **options):
-
-        logger = logging.getLogger(__name__)
-        log_errors = options['log']
-        echo_errors = not options['log']
-
-        if len(options['resource_ids']) > 0:  # an array of resource short_id to check.
-            for rid in options['resource_ids']:
-                try:
-                    r = BaseResource.objects.get(short_id=rid)
-                except BaseResource.DoesNotExist:
-                    msg = "Resource with id {} not found in Django Resources".format(rid)
-                    if log_errors:
-                        logger.info(msg)
-                    if echo_errors:
-                        print(msg)
-                    continue  # next resource
-
-                # Pabitra: Not sure why are we skipping other resource types
-                # Alva: cannot preserve file integrity constraints for other file types.
-                if r.resource_type != 'CompositeResource' and \
-                   r.resource_type != 'GenericResource' and \
-                   r.resource_type != 'ModelInstanceResource' and \
-                   r.resource_type != 'ModelProgramResource':
-                    print("resource {} has type {}: skipping".format(r.short_id,
-                                                                     r.resource_type))
-                else:
-                    print("LOOKING FOR UNREGISTERED IRODS FILES FOR RESOURCE {} (current files {})"
-                          .format(rid, str(r.files.all().count())))
-                    # get the typed resource
-                    try:
-                        resource = r.get_content_model()
-                    except Exception as e:
-                        msg = "resource {} has no proxy resource: {}"\
-                              .format(r.short_id, e.value)
-                        if log_errors:
-                            logger.info(msg)
-                        if echo_errors:
-                            print(msg)
-                        msg = "... affected resource {} has type {}, title '{}'"\
-                              .format(r.short_id, r.resource_type, r.title)
-                        if log_errors:
-                            logger.info(msg)
-                        if echo_errors:
-                            print(msg)
-                        continue
-
-                    _, count = ingest_irods_files(resource,
-                                                  logger,
-                                                  stop_on_error=False,
-                                                  echo_errors=not options['log'],
-                                                  log_errors=options['log'],
-                                                  return_errors=False)
-                    if count:
-                        msg = "... affected resource {} has type {}, title '{}'"\
-                              .format(resource.short_id, resource.resource_type,
-                                      resource.title)
-                        if log_errors:
-                            logger.info(msg)
-                        if echo_errors:
-                            print(msg)
-
-        else:  # check all resources
-            print("LOOKING FOR UNREGISTERED IRODS FILES FOR ALL RESOURCES")
-            for r in BaseResource.objects.all():
-                # Pabitra: Not sure why are we skipping other resource types
-                # Alva: cannot preserve file integrity constraints for other file types.
-                if r.resource_type == 'CompositeResource' or \
-                   r.resource_type == 'GenericResource' or \
-                   r.resource_type == 'ModelInstanceResource' or \
-                   r.resource_type == 'ModelProgramResource':
-                    print("LOOKING FOR UNREGISTERED IRODS FILES FOR RESOURCE {} (current files {})"
-                          .format(r.short_id, str(r.files.all().count())))
-                    try:
-                        # get the typed resource
-                        resource = r.get_content_model()
-                    except Exception as e:
-                        msg = "resource {} has no proxy resource: {}"\
-                              .format(r.short_id, e.value)
-                        if log_errors:
-                            logger.info(msg)
-                        if echo_errors:
-                            print(msg)
-                        msg = "... affected resource {} has type {}, title '{}'"\
-                              .format(r.short_id, r.resource_type, r.title)
-                        if log_errors:
-                            logger.info(msg)
-                        if echo_errors:
-                            print(msg)
-                        continue  # next resource
-
-                    _, count = ingest_irods_files(resource,
-                                                  logger,
-                                                  stop_on_error=False,
-                                                  echo_errors=not options['log'],
-                                                  log_errors=options['log'],
-                                                  return_errors=False)
-                    if count:
-                        msg = "... affected resource {} has type {}, title '{}'"\
-                              .format(resource.short_id, resource.resource_type, resource.title)
-                        if log_errors:
-                            logger.info(msg)
-                        if echo_errors:
-                            print(msg)
-
-                else:
-                    print("resource {} has type {}: skipping".format(r.short_id, r.resource_type))
+    def resource_action(self, resource, options):
+        # Pabitra: Not sure why are we skipping other resource types
+        # Alva: cannot preserve file integrity constraints for other file types.
+        if resource.resource_type != 'CompositeResource' and \
+           resource.resource_type != 'GenericResource' and \
+           resource.resource_type != 'ModelInstanceResource' and \
+           resource.resource_type != 'ModelProgramResource':
+            if options['verbose']:
+                self.log("resource {} has type {}: skipping".format(resource.short_id,
+                                                                    resource.resource_type))
+        else:
+            if options['verbose']:
+                self.log("LOOKING FOR UNREGISTERED IRODS FILES FOR RESOURCE {} ({} files)"
+                         .format(resource.short_id, str(resource.files.all().count())))
+        _, count = ingest_irods_files(resource,
+                                      self.logger,
+                                      stop_on_error=False,
+                                      echo_errors=not options['log'],
+                                      log_errors=options['log'],
+                                      return_errors=False)
+        if count:
+            msg = "... affected resource {} has type {}, title '{}'"\
+                  .format(resource.short_id, resource.resource_type,
+                          resource.title)
+            self.log(msg, options)

@@ -45,7 +45,7 @@ def check_relations(resource):
                       .format(target))
 
 
-def fix_irods_user_paths(resource, log_actions=True, echo_actions=False, return_actions=False):
+def fix_irods_user_paths(resource, logger, log_actions=True, echo_actions=False, return_actions=False):
     """Move iRODS user paths to the locations specified in settings.
 
     :param resource: resource to check
@@ -63,7 +63,6 @@ def fix_irods_user_paths(resource, log_actions=True, echo_actions=False, return_
     * It must be done once whenever the django database is reloaded.
     * It does not check whether the paths exist afterward. This is done by check_irods_files.
     """
-    logger = logging.getLogger(__name__)
     actions = []
     ecount = 0
 
@@ -487,6 +486,7 @@ def __ingest_irods_directory(resource,
                 if resource.resource_type == "CompositeResource":
                     file_type = get_logical_file_type(res=resource, user=None,
                                                       file_id=res_file.pk, fail_feedback=False)
+                    # TODO: check that this is warranted under new model. 
                     if not res_file.has_logical_file and file_type is not None:
                         msg = "ingest_irods_files: setting required logical file for {}"\
                               .format(fullpath)
@@ -514,18 +514,19 @@ def __ingest_irods_directory(resource,
                             errors.append(msg)
                         if stop_on_error:
                             raise ValidationError(msg)
-                    elif res_file.has_logical_file and file_type is None:
-                        msg = "ingest_irods_files: logical file for {} has type {}, not needed"\
-                            .format(res_file.storage_path, type(res_file.logical_file).__name__,
-                                    file_type.__name__)
-                        if echo_errors:
-                            print(msg)
-                        if log_errors:
-                            logger.error(msg)
-                        if return_errors:
-                            errors.append(msg)
-                        if stop_on_error:
-                            raise ValidationError(msg)
+                    # This is not really an error. Users can create this situation. 
+                    # elif res_file.has_logical_file and file_type is None:
+                    #     msg = "ingest_irods_files: logical file for {} has type {}, not needed"\
+                    #         .format(res_file.storage_path, type(res_file.logical_file).__name__,
+                    #                 file_type.__name__)
+                    #     if echo_errors:
+                    #         print(msg)
+                    #     if log_errors:
+                    #         logger.error(msg)
+                    #     if return_errors:
+                    #         errors.append(msg)
+                    #     if stop_on_error:
+                    #         raise ValidationError(msg)
 
         for dname in listing[0]:  # directories
             # do not use os.path.join because fname might contain unicode characters
@@ -576,8 +577,9 @@ def check_for_dangling_irods(echo_errors=True, log_errors=False, return_errors=F
 class CheckJSONLD(object):
     def __init__(self, short_id):
         self.short_id = short_id
+        self.logger = logging.getLogger(__name__)
 
-    def test(self):
+    def test(self, options):
         default_site = Site.objects.first()
         validator_url = "https://search.google.com/structured-data/testing-tool/validate"
         url = "https://" + default_site.domain + "/resource/" + self.short_id
@@ -590,17 +592,19 @@ class CheckJSONLD(object):
             for error in response_json.get("errors"):
                 if "includedInDataCatalog" not in error.get('args'):
                     errors = response_json.get("errors")
-                    print("Error found on resource {}: {}".format(self.short_id, errors))
+                    log_or_print("Error found on resource {}: {}".format(self.short_id, errors), 
+                                 self.logger, options)
                     return
 
         if response_json.get("totalNumWarnings") > 0:
             warnings = response_json.get("warnings")
-            print("Warnings found on resource {}: {}".format(self.short_id, warnings))
+            log_or_print("Warnings found on resource {}: {}".format(self.short_id, warnings), 
+                         self.logger, options)
             return
 
 
-def log_or_print(message, logger, log_errors):
-    if log_errors:
+def log_or_print(message, logger, options):
+    if options['log']:
         logger.info(message)
     else:
         print(message)
@@ -843,7 +847,7 @@ class ResourceCommand(BaseCommand):
 
     logger = logging.getLogger(__name__)
 
-    def log(self, message, options):
+    def log_or_print(self, message, options):
         if options['log']:
             self.logger.info(message)
         else:
@@ -890,26 +894,26 @@ class ResourceCommand(BaseCommand):
                 try:
                     resource = get_resource_by_shortkey(rid, or_404=False)
                 except BaseResource.DoesNotExist:
-                    self.log("Resource {} does not exist in Django"
-                             .format(resource.short_id), options)
+                    self.log_or_print("Resource {} does not exist in Django"
+                                      .format(resource.short_id), options)
                     continue
                 if options['verbose']:
-                    self.log("Processing {}".format(resource.short_id), options)
+                    self.log_or_print("Processing {}".format(resource.short_id), options)
 
                 self.resource_action(resource, options)
         else:
             if self.default_to_all:
                 if options['verbose']:
-                    self.log("ACTING ON ALL RESOURCES", options)
+                    self.log_or_print("ACTING ON ALL RESOURCES", options)
                 for r in BaseResource.objects.all():
                     try:
                         resource = get_resource_by_shortkey(r.short_id, or_404=False)
                     except BaseResource.DoesNotExist:
-                        self.log("Resource {} does not exist in Django"
-                                 .format(r.short_id), options)
+                        self.log_or_print("Resource {} does not exist in Django"
+                                          .format(r.short_id), options)
                         continue
                     if options['verbose']:
-                        self.log("Processing {}".format(resource.short_id), options)
+                        self.log_or_print("Processing {}".format(resource.short_id), options)
                     self.resource_action(resource, options)
             else:
-                self.log("no resources specified.")
+                self.log_or_print("no resources specified.", options)
