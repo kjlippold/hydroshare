@@ -126,8 +126,7 @@ def fix_irods_user_paths(resource, logger, options, return_actions=False):
     return actions, acount  # empty unless return_actions=True
 
 
-def check_irods_files(resource, logger, options,
-                      return_errors=False):
+def check_irods_files(resource, logger, options, return_errors=False):
     """Check whether files in resource.files and on iRODS agree.
 
     :param resource: resource to check
@@ -164,7 +163,7 @@ def check_irods_files(resource, logger, options,
 
     else:
         # Step 1: repair irods user file paths if necessary
-        if options['clean_irods'] or options['clean_django']:
+        if getattr(options, 'clean_irods', False) or getattr(options, 'clean_django', False):
             # fix user paths before check (required). This is an idempotent step.
             if resource.resource_federation_path == defaultpath:
                 error2, ecount2 = fix_irods_user_paths(resource, logger, options,
@@ -177,7 +176,7 @@ def check_irods_files(resource, logger, options,
             if not istorage.exists(f.storage_path):
                 msg = "check_irods_files: django file {} does not exist in iRODS"\
                     .format(f.storage_path)
-                if options['clean_django']:
+                if getattr(options, 'clean_django', False):
                     delete_resource_file(resource.short_id, f.short_path, resource.creator,
                                          delete_logical_file=False)
                     msg += " (DELETED FROM DJANGO)"
@@ -233,7 +232,7 @@ def check_irods_files(resource, logger, options,
             if not django_public:  # and irods_public
                 msg = "check_irods_files: resource {} public in irods, private in Django"\
                     .format(resource.short_id)
-                if options['sync_ispublic']:
+                if getattr(options, 'sync_ispublic', False):
                     try:
                         resource.setAVU('isPublic', 'false')
                         msg += " (REPAIRED IN IRODS)"
@@ -244,7 +243,7 @@ def check_irods_files(resource, logger, options,
             else:  # django_public and not irods_public
                 msg = "check_irods_files: resource {} private in irods, public in Django"\
                     .format(resource.short_id)
-                if options['sync_ispublic']:
+                if getattr(options, 'sync_ispublic', False):
                     try:
                         resource.setAVU('isPublic', 'true')
                         msg += " (REPAIRED IN IRODS)"
@@ -434,7 +433,7 @@ def __ingest_irods_directory(resource,
                     #         logger.error(msg)
                     #     if return_errors:
                     #         errors.append(msg)
-                    #     if options['stop_on_error']:
+                    #     if getattr(options, 'stop_on_error', False):
                     #         raise ValidationError(msg)
 
         for dname in listing[0]:  # directories
@@ -510,8 +509,8 @@ class CheckJSONLD(object):
 
 
 def log_or_print_verbose(message, logger, options):
-    if options['verbose']:
-        if options['log']:
+    if getattr(options, 'verbose', False):
+        if getattr(options, 'log', False):
             logger.info(message)
         else:
             print(message)
@@ -526,7 +525,7 @@ def log_or_print_warning(message, logger, options):
 
 
 def log_or_print(message, logger, options, error=False, warning=False):
-    if options['log']:
+    if getattr(options, 'log', False):
         if error:
             logger.error(message)
         elif warning:
@@ -535,7 +534,7 @@ def log_or_print(message, logger, options, error=False, warning=False):
             logger.info(message)
     else:
         print(message)
-    if error and options['stop_on_error']:
+    if error and getattr(options, 'stop_on_error', False):
         raise ValidationError(message)
 
 
@@ -572,8 +571,7 @@ def repair_resource(res, logger, options, return_errors=False):
                                        resource.title.encode('ascii', 'replace')),
                                logger, options)
 
-    _, count = check_irods_files(resource, logger, options,
-                                 return_errors=False)
+    _, count = check_irods_files(resource, logger, options, return_errors=False)
     if count:
         log_or_print_error("... affected resource {} has type {}, title '{}'"
                            .format(resource.short_id, resource.resource_type,
@@ -605,7 +603,7 @@ class CheckResource(object):
             print("  AVU {} NOT FOUND.".format(label))
             return None
 
-    def test(self):
+    def test(self, logger, options):
         """ Test view for resource depicts output of various integrity checking scripts """
 
         # print("TESTING {}".format(self.short_id))  # leave this for debugging
@@ -620,42 +618,42 @@ class CheckResource(object):
         if self.resource.is_federated and not settings.REMOTE_USE_IRODS:
             msg = "check_resource: skipping check of federated resource {} in unfederated mode"\
                 .format(self.resource.short_id)
-            print(msg)
+            log_or_print(msg, logger, options)
 
         istorage = self.resource.get_irods_storage()
 
         if not istorage.exists(self.resource.root_path):
             self.label()
-            print("  root path {} does not exist in iRODS".format(self.resource.root_path))
-            print("  ... resource {} has type {} and title {}"
-                  .format(self.resource.short_id,
-                          self.resource.resource_type,
-                          self.resource.title.encode('ascii', 'replace')))
+            log_or_print("  root path {} does not exist in iRODS".format(self.resource.root_path),
+                         logger, options)
+            log_or_print("  ... resource {} has type {} and title {}"
+                         .format(self.resource.short_id,
+                                 self.resource.resource_type,
+                                 self.resource.title.encode('ascii', 'replace')),
+                         logger, options)
             return
 
         for a in ('bag_modified', 'isPublic', 'resourceType', 'quotaUserName'):
             value = self.check_avu(a)
             if a == 'resourceType' and value is not None and value != self.resource.resource_type:
                 self.label()
-                print("  AVU resourceType is {}, should be {}".format(value.encode('ascii',
-                                                                                   'replace'),
-                                                                      self.resource.resource_type))
+                log_or_print("  AVU resourceType is {}, should be {}"
+                             .format(value.encode('ascii', 'replace'),
+                                     self.resource.resource_type),
+                             logger, options)
             if a == 'isPublic' and value is not None and value != self.resource.raccess.public:
                 self.label()
-                print("  AVU isPublic is {}, but public is {}".format(value.encode('ascii',
-                                                                                   'replace'),
-                                                                      self.resource.raccess.public))
+                log_or_print("  AVU isPublic is {}, but public is {}"
+                             .format(str(value), self.resource.raccess.public), logger, options)
 
-        irods_issues, irods_errors = check_irods_files(self.resource,
-                                                       log_errors=False,
-                                                       echo_errors=False,
+        irods_issues, irods_errors = check_irods_files(self.resource, logger, options,
                                                        return_errors=True)
 
         if irods_errors:
             self.label()
-            print("  iRODS errors:")
+            log_or_print("  iRODS errors:", logger, options)
             for e in irods_issues:
-                print("    {}".format(e))
+                log_or_print("    {}".format(e), logger, options)
 
         if self.resource.resource_type == 'CompositeResource':
             logical_issues = []
@@ -682,9 +680,9 @@ class CheckResource(object):
 
             if logical_issues:
                 self.label()
-                print("  Logical file errors:")
+                log_or_print("  Logical file errors:", logger, options)
                 for e in logical_issues:
-                    print("    {}".format(e))
+                    log_or_print("    {}".format(e), logger, options)
 
 
 def debug_resource(short_id, logger, options):
@@ -698,8 +696,7 @@ def debug_resource(short_id, logger, options):
     resource = res.get_content_model()
     assert resource, (res, res.content_model)
 
-    irods_issues, irods_errors = check_irods_files(resource,
-                                                   log_errors=options['log'],
+    irods_issues, irods_errors = check_irods_files(resource, logger, options,
                                                    return_errors=True)
     log_or_print("resource: {}"
                  .format(short_id), logger, options)
@@ -776,7 +773,7 @@ def check_bag(rid, logger, options):
         modified = resource.getAVU('bag_modified')
         log_or_print("{}.bag_modified is {}".format(rid, str(modified)), logger, options)
 
-        if options['reset']:  # reset all data to pristine
+        if getattr(options, 'reset', False):  # reset all data to pristine
             resource.setAVU('metadata_dirty', 'true')
             print("{}.metadata_dirty set to true".format(rid))
             try:
@@ -804,7 +801,7 @@ def check_bag(rid, logger, options):
                                    .format(resource.bag_path, ex.stderr),
                                    logger, options)
 
-        if options['reset_metadata']:
+        if getattr(options, 'reset_metadata', False):
             resource.setAVU('metadata_dirty', 'true')
             log_or_print("{}.metadata_dirty set to true".format(rid), logger, options)
             try:
@@ -822,7 +819,7 @@ def check_bag(rid, logger, options):
                                    .format(resource.resmap_path, ex.stderr),
                                    logger, options)
 
-        if options['reset_bag']:
+        if getattr(options, 'reset_bag', False):
             resource.setAVU('bag_modified', 'true')
             log_or_print("{}.bag_modified set to true".format(rid), logger, options)
             try:
@@ -833,8 +830,9 @@ def check_bag(rid, logger, options):
                                    .format(resource.bag_path, ex.stderr),
                                    logger, options)
 
-        if options['generate']:  # generate usable bag
-            if not options['if_needed'] or dirty or not scimeta_exists or not resmap_exists:
+        if getattr(options, 'generate', False):  # generate usable bag
+            if not getattr(options, 'if_needed', False) or \
+               dirty or not scimeta_exists or not resmap_exists:
                 try:
                     create_bag_files(resource)
                 except ValueError as e:
@@ -848,14 +846,15 @@ def check_bag(rid, logger, options):
                 log_or_print("{}.metadata_dirty set to false".format(rid), logger, options)
                 log_or_print("{}.bag_modified set to true".format(rid), logger, options)
 
-            if not options['if_needed'] or modified or not bag_exists:
+            if not getattr(options, 'if_needed', False) or modified or not bag_exists:
                 create_bag_by_irods(rid)
                 log_or_print("{} bag generated from iRODs".format(rid), logger, options)
                 resource.setAVU('bag_modified', 'false')
                 log_or_print("{}.bag_modified set to false".format(rid), logger, options)
 
-        if options['generate_metadata']:
-            if not options['if_needed'] or dirty or not scimeta_exists or not resmap_exists:
+        if getattr(options, 'generate_metadata', False):
+            if not getattr(options, 'if_needed', False) or \
+               dirty or not scimeta_exists or not resmap_exists:
                 try:
                     create_bag_files(resource)
                 except ValueError as e:
@@ -868,15 +867,15 @@ def check_bag(rid, logger, options):
                 resource.setAVU('bag_modified', 'true')
                 log_or_print("{}.bag_modified set to false".format(rid), logger, options)
 
-        if options['generate_bag']:
-            if not options['if_needed'] or modified or not bag_exists:
+        if getattr(options, 'generate_bag', False):
+            if not getattr(options, 'if_needed', False) or modified or not bag_exists:
                 create_bag_by_irods(rid)
                 log_or_print("{}: bag generated from iRODs".format(rid), logger, options)
                 resource.setAVU('bag_modified', 'false')
                 log_or_print("{}.bag_modified set to false".format(rid), logger, options)
 
-        if options['download_bag']:
-            if options['password']:
+        if getattr(options, 'download_bag', False):
+            if getattr(options, 'password', '') != '' and getattr(options, 'login', '') != '':
                 server = getattr(settings, 'FQDN_OR_IP', 'www.hydroshare.org')
                 uri = "https://{}/hsapi/resource/{}/".format(server, rid)
                 log_or_print("download uri is {}".format(uri))
@@ -894,8 +893,8 @@ def check_bag(rid, logger, options):
             else:
                 print("cannot download bag without username and password.")
 
-        if options['open_bag']:
-            if options['password']:
+        if getattr(options, 'open_bag', False):
+            if getattr(options, 'password', '') != '' and getattr(options, 'login', '') != '':
                 server = getattr(settings, 'FQDN_OR_IP', 'www.hydroshare.org')
                 uri = "https://{}/hsapi/resource/{}/".format(server, rid)
                 print("download uri is {}".format(uri))
