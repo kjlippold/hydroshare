@@ -12,4 +12,4 @@ class Command(ResourceCommand):
     default_to_all = False
 
     def resource_action(self, resource, options):
-        debug_resource(resource.rid, self.logger, options)
+        debug_resource(resource.short_id, self.logger, options)

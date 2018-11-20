@@ -13,6 +13,5 @@ class Command(ResourceCommand):
 
     def resource_action(self, resource, options):
         self.log_or_print_verbose("LOOKING FOR RELATION ERRORS FOR RESOURCE {}"
-                                  .format(resource.short_id),
-                                  self.logger, options)
-        check_relations(resource)
+                                  .format(resource.short_id), options)
+        check_relations(resource, self.logger, options)
