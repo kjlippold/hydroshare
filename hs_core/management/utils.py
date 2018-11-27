@@ -205,8 +205,9 @@ def check_irods_files(resource, logger, options, return_errors=False):
                         errors.append(msg)
 
         # Step 4: does every iRODS file correspond to a record in files?
-        error2, ecount2 = __check_irods_directory(resource, resource.file_path, logger, options,
-                                                  return_errors=return_errors)
+        # cast file paths to unicode to avoid type errors when combining paths
+        error2, ecount2 = __check_irods_directory(resource, unicode(resource.file_path), 
+                                                  logger, options, return_errors=return_errors)
         errors.extend(error2)
         ecount += ecount2
 
@@ -285,7 +286,7 @@ def __check_irods_directory(resource, dir, logger, options,
         listing = istorage.listdir(dir)
         for fname in listing[1]:  # files
             # do not use os.path.join because fname might contain unicode characters
-            fullpath = dir + '/' + fname
+            fullpath = dir.decode('utf-8') + u'/' + fname.decode('utf-8')
             found = False
             for f in resource.files.all():
                 if f.storage_path == fullpath:
@@ -402,17 +403,17 @@ def __ingest_irods_directory(resource,
                 if resource.resource_type == "CompositeResource":
                     file_type = get_logical_file_type(res=resource, user=None,
                                                       file_id=res_file.pk, fail_feedback=False)
-                    # TODO: check that this is warranted under new model.
-                    if not res_file.has_logical_file and file_type is not None:
-                        msg = "ingest_irods_files: setting required logical file for {}"\
-                              .format(fullpath)
-                        log_or_print_error(msg, logger, options)
-                        ecount += 1
-                        if return_errors:
-                            errors.append(msg)
-                        set_logical_file_type(res=resource, user=None, file_id=res_file.pk,
-                                              fail_feedback=False)
-                    elif res_file.has_logical_file and file_type is not None and \
+                    # # TODO: check that this is warranted under new model.
+                    # if not res_file.has_logical_file and file_type is not None:
+                    #     msg = "ingest_irods_files: setting required logical file for {}"\
+                    #           .format(fullpath)
+                    #     log_or_print_error(msg, logger, options)
+                    #     ecount += 1
+                    #     if return_errors:
+                    #         errors.append(msg)
+                    #     set_logical_file_type(res=resource, user=None, file_id=res_file.pk,
+                    #                           fail_feedback=False)
+                    if res_file.has_logical_file and file_type is not None and \
                             not isinstance(res_file.logical_file, file_type):
                         msg = "ingest_irods_files: logical file for {} has type {}, should be {}"\
                             .format(res_file.storage_path.encode('ascii', 'replace'),
@@ -422,6 +423,29 @@ def __ingest_irods_directory(resource,
                         ecount += 1
                         if return_errors:
                             errors.append(msg)
+
+                    # check that declared logical files actually exist in iRODS
+                    if res_file.has_logical_file:
+                        if not istorage.exists(res_file.logical_file.metadata_file_path):
+                            msg = ("ingest_irods_files: logical metadata file {} for {} " +
+                                   "does not exist")\
+                                .format(res_file.logical_file.metadata_file_path,
+                                        res_file.short_path)
+                            log_or_print_error(msg, logger, options)
+                            ecount += 1
+                            if return_errors:
+                                errors.append(msg)
+
+                        if not istorage.exists(res_file.logical_file.map_file_path):
+                            msg = ("ingest_irods_files: logical metadata file {} for {} " +
+                                   "does not exist")\
+                                .format(res_file.logical_file.map_file_path,
+                                        res_file.short_path)
+                            log_or_print_error(msg, logger, options)
+                            ecount += 1
+                            if return_errors:
+                                errors.append(msg)
+
                     # This is not really an error. Users can create this situation.
                     # elif res_file.has_logical_file and file_type is None:
                     #     msg = "ingest_irods_files: logical file for {} has type {}, not needed"\
@@ -665,11 +689,13 @@ class CheckResource(object):
                           .format(res_file.storage_path.encode('ascii', 'replace'),
                                   file_type.__name__)
                     logical_issues.append(msg)
-                elif res_file.has_logical_file and file_type is None:
-                    msg = "check_resource: logical file for {} has type {}, not needed"\
-                          .format(res_file.storage_path.encode('ascii', 'replace'),
-                                  type(res_file.logical_file).__name__)
-                    logical_issues.append(msg)
+
+                # This can happen legally in many ways
+                # elif res_file.has_logical_file and file_type is None:
+                #     msg = "check_resource: logical file for {} has type {}, not needed"\
+                #           .format(res_file.storage_path.encode('ascii', 'replace'),
+                #                   type(res_file.logical_file).__name__)
+                #     logical_issues.append(msg)
                 elif res_file.has_logical_file and file_type is not None and \
                         not isinstance(res_file.logical_file, file_type):
                     msg = "check_resource: logical file for {} has type {}, should be {}"\
@@ -677,6 +703,23 @@ class CheckResource(object):
                                   type(res_file.logical_file).__name__,
                                   file_type.__name__)
                     logical_issues.append(msg)
+                # check that declared logical files actually exist in iRODS
+                if res_file.has_logical_file:
+                    if not istorage.exists(res_file.logical_file.metadata_file_path):
+                        msg = ("ingest_irods_files: logical metadata file {} for {} " +
+                               "does not exist")\
+                            .format(res_file.logical_file.metadata_file_path,
+                                    res_file.short_path)
+                        log_or_print_error(msg, logger, options)
+                        logical_issues.append(msg)
+
+                    if not istorage.exists(res_file.logical_file.map_file_path):
+                        msg = ("ingest_irods_files: logical metadata file {} for {} " +
+                               "does not exist")\
+                            .format(res_file.logical_file.map_file_path,
+                                    res_file.short_path)
+                        log_or_print_error(msg, logger, options)
+                        logical_issues.append(msg)
 
             if logical_issues:
                 self.label()

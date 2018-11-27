@@ -198,6 +198,7 @@ def get_logical_file_type(res, user, file_id, hs_file_type=None, folder_path=Non
         ext_to_type = {".tif": "GeoRaster", ".tiff": "GeoRaster", ".vrt": "GeoRaster",
                        ".nc": "NetCDF", ".shp": "GeoFeature", ".json": "RefTimeseries",
                        ".sqlite": "TimeSeries"}
+        # TODO: this code crashes on UniCode file names 
         file_name = str(res_file)
         root, ext = os.path.splitext(file_name)
         ext = ext.lower()
